@@ -137,8 +137,9 @@ passLoop:
 
 				if !exists {
 					atomic.AddInt64(&found, 1)
-					h.Hostname = lookupHostname(ctx, ip)
+					hostname := lookupHostname(ctx, ip)
 					hostsMu.Lock()
+					h.Hostname = hostname
 					snap := *h
 					hostsMu.Unlock()
 					publish(Event{Type: "host", Host: &snap})
@@ -153,16 +154,27 @@ passLoop:
 
 		arpTable, _ := ReadARPTable()
 		hostsMu.Lock()
+		var newlyEnriched []Host
 		for ip, h := range hosts {
 			if mac, ok := arpTable[ip]; ok {
 				passResults[p][ip] = mac
 				if h.MAC == "" {
 					h.MAC = mac
 					h.Vendor = VendorLookup(mac)
+					newlyEnriched = append(newlyEnriched, *h)
 				}
 			}
 		}
 		hostsMu.Unlock()
+
+		// The MAC/vendor lookup above happens after the initial "host"
+		// event for each address was already sent (a ping success alone
+		// doesn't tell us the MAC yet), so push an update now that it's
+		// known -- otherwise the UI and CSV export would show every host
+		// with a permanently blank MAC/vendor.
+		for i := range newlyEnriched {
+			publish(Event{Type: "host", Host: &newlyEnriched[i]})
+		}
 
 		sendStatus(p, len(addrs))
 
