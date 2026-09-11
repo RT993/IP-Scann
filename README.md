@@ -114,6 +114,17 @@ missed. Increase **Advanced options → Conflict-detection passes** for more
 thorough (if slower) checking on networks where you suspect an
 intermittent conflict.
 
+If the scanner flags a conflict where *this Mac* is one of the two
+addresses, `scripts/renew-dhcp-lease.sh` will force this machine to
+request a fresh lease from the router. It only touches this machine —
+resolving a conflict on some *other* device means logging into the router
+itself, which is out of scope for this tool.
+
+```sh
+./scripts/renew-dhcp-lease.sh          # auto-detects the active interface
+./scripts/renew-dhcp-lease.sh en0      # or name one explicitly
+```
+
 ## How hostname detection works
 
 Most home routers don't publish DNS names for the devices they hand out
