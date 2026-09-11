@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"sort"
 	"sync"
@@ -12,6 +13,17 @@ import (
 	"github.com/rt993/ip-scann/internal/netutil"
 	"github.com/rt993/ip-scann/internal/scanner"
 )
+
+// validIP reports whether s is a literal IP address. Every tool handler
+// that shells out to an external binary (ping, traceroute, nmap) with the
+// client-supplied IP as one argv element uses this first: exec.Command
+// never invokes a shell, so this isn't about shell injection, but a string
+// like "-oN /tmp/x" would still be parsed as a flag by the target binary's
+// own argument parser if passed through unchecked. A valid IP literal can
+// never start with "-", which closes that off.
+func validIP(s string) bool {
+	return net.ParseIP(s) != nil
+}
 
 // ---------- Ping / latency ----------
 
@@ -23,8 +35,8 @@ type pingRequest struct {
 
 func (s *Server) handleToolPing(w http.ResponseWriter, r *http.Request) {
 	var req pingRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.IP == "" {
-		writeError(w, http.StatusBadRequest, "ip is required")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !validIP(req.IP) {
+		writeError(w, http.StatusBadRequest, "a valid ip address is required")
 		return
 	}
 	timeout := time.Duration(req.TimeoutMs) * time.Millisecond
@@ -47,8 +59,8 @@ type osGuessRequest struct {
 
 func (s *Server) handleToolOSGuess(w http.ResponseWriter, r *http.Request) {
 	var req osGuessRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.IP == "" {
-		writeError(w, http.StatusBadRequest, "ip is required")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !validIP(req.IP) {
+		writeError(w, http.StatusBadRequest, "a valid ip address is required")
 		return
 	}
 	ttl := req.TTL
@@ -77,8 +89,8 @@ type portResult struct {
 
 func (s *Server) handleToolPortScan(w http.ResponseWriter, r *http.Request) {
 	var req portScanRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.IP == "" {
-		writeError(w, http.StatusBadRequest, "ip is required")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !validIP(req.IP) {
+		writeError(w, http.StatusBadRequest, "a valid ip address is required")
 		return
 	}
 	ports := req.Ports
@@ -110,8 +122,8 @@ type serviceRequest struct {
 
 func (s *Server) handleToolService(w http.ResponseWriter, r *http.Request) {
 	var req serviceRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.IP == "" || len(req.Ports) == 0 {
-		writeError(w, http.StatusBadRequest, "ip and ports are required")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !validIP(req.IP) || len(req.Ports) == 0 {
+		writeError(w, http.StatusBadRequest, "a valid ip address and ports are required")
 		return
 	}
 	if len(req.Ports) > 64 {
@@ -145,8 +157,8 @@ type tracerouteRequest struct {
 
 func (s *Server) handleToolTracerouteStart(w http.ResponseWriter, r *http.Request) {
 	var req tracerouteRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.IP == "" {
-		writeError(w, http.StatusBadRequest, "ip is required")
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !validIP(req.IP) {
+		writeError(w, http.StatusBadRequest, "a valid ip address is required")
 		return
 	}
 	tj, err := s.tools.startTraceroute(req.IP)
@@ -187,6 +199,45 @@ func (s *Server) handleToolTracerouteStream(w http.ResponseWriter, r *http.Reque
 		flusher.Flush()
 		return true
 	})
+}
+
+// ---------- Deep scan (optional, nmap) ----------
+
+type capabilitiesResponse struct {
+	NmapAvailable bool `json:"nmapAvailable"`
+	IsRoot        bool `json:"isRoot"`
+}
+
+func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, capabilitiesResponse{
+		NmapAvailable: scanner.NmapAvailable(),
+		IsRoot:        scanner.IsRoot(),
+	})
+}
+
+type deepScanRequest struct {
+	IP             string `json:"ip"`
+	ServiceVersion bool   `json:"serviceVersion"`
+	OSDetection    bool   `json:"osDetection"`
+}
+
+func (s *Server) handleToolDeepScan(w http.ResponseWriter, r *http.Request) {
+	var req deepScanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || !validIP(req.IP) {
+		writeError(w, http.StatusBadRequest, "a valid ip address is required")
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
+	defer cancel()
+	result, err := scanner.DeepScan(ctx, req.IP, scanner.DeepScanOptions{
+		ServiceVersion: req.ServiceVersion,
+		OSDetection:    req.OSDetection,
+	})
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
 }
 
 // ---------- Wake-on-LAN ----------

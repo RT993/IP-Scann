@@ -40,6 +40,10 @@ server and opens the UI in your browser.
     open to identify the service (and version, where the service
     advertises one).
   - **Traceroute** — maps the network path to the host, hop by hop, live.
+  - **Deep scan (optional, nmap)** — real raw-packet OS fingerprinting and
+    nmap's full version-detection probe database, if nmap is installed. Off
+    by default and opt-in per host; see
+    [Deep scan (optional, nmap)](#deep-scan-optional-nmap).
   - **Wake-on-LAN** — sends a magic packet to power on a sleeping,
     WoL-enabled device.
   - **Shared folder / printer / remote-access quick links** — one-click
@@ -136,8 +140,8 @@ scan failure.
 
 ## How the tools work
 
-Like the ping-based conflict detection above, every per-host tool is built
-to need no root/admin privileges and no raw sockets. That keeps it simple to
+Every tool except the optional nmap-backed deep scan below is built to need
+no root/admin privileges and no raw sockets. That keeps the app simple to
 run, but it's worth being clear about what each one actually is:
 
 - **OS guess is a heuristic, not fingerprinting.** Real OS fingerprinting
@@ -148,7 +152,8 @@ run, but it's worth being clear about what each one actually is:
   routers/appliances to 255 — a strong but not certain tell), the MAC
   vendor, and any well-known ports found open (e.g. 3389 strongly implies
   Windows). The "signals" list under the guess shows exactly which of these
-  fired, so you can judge the guess yourself rather than trust a label.
+  fired, so you can judge the guess yourself rather than trust a label. Run
+  a deep scan (below) for the real thing.
 - **Service/version detection is banner-grabbing, not nmap's probe
   database.** It reads whatever a service volunteers on connect (SSH, FTP,
   SMTP, MySQL, Redis, etc. all send a greeting first), or for HTTP/TLS ports
@@ -173,6 +178,43 @@ run, but it's worth being clear about what each one actually is:
   handoff any desktop scanner's "open share" button relies on, just via a
   standard link instead of a native API call.
 
+## Deep scan (optional, nmap)
+
+Everything above is deliberately built to never need root/admin privileges
+or an external dependency. Real OS fingerprinting and nmap's full
+version-detection probe database need both, so instead of baking that in as
+the default (and asking everyone to run this app as root to get it), it's
+an opt-in tool: install nmap yourself, and use it only when you actually
+need the deeper answer for one specific host.
+
+**Setup:**
+
+```sh
+brew install nmap
+```
+
+That alone unlocks service/version detection via nmap's probe database
+(more thorough than this app's own banner-grabbing) from the Tools panel's
+"Deep scan" section — still no sudo needed. **OS detection** additionally
+needs raw sockets, which means running the whole app as root:
+
+```sh
+sudo ./dist/ip-scanner-darwin-universal
+```
+
+**Think about that trade-off before doing it.** Running the entire server
+as root — rather than just the one nmap process that needs it — means any
+bug in this app's own code, or in a browser tab that reaches its local
+port, now has root-level reach instead of your user account's. It's why
+this isn't the default and isn't required for anything else in the app. If
+you only need service/version detection, skip `sudo` entirely; it works
+fine without it. Only reach for `sudo` when you specifically need OS
+detection on a specific host, and treat that as a temporary, deliberate
+session rather than how you normally run the tool.
+
+If nmap isn't installed, the deep-scan section explains that and disables
+itself rather than silently failing.
+
 ## Architecture
 
 ```
@@ -183,7 +225,8 @@ internal/scanner/           ping/TCP probing, ARP table reading, OUI vendor
                              lookup, duplicate-IP/MAC conflict detection,
                              scan orchestration, and the per-host tools:
                              OS guessing, banner/service detection,
-                             traceroute, Wake-on-LAN
+                             traceroute, Wake-on-LAN, and the optional
+                             nmap-backed deep scan
 internal/api/                job manager, Server-Sent Events streaming,
                              REST + CSV export endpoints, per-host tool
                              endpoints (/api/tools/*)

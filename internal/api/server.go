@@ -29,6 +29,8 @@ func NewRouter() http.Handler {
 	mux.HandleFunc("GET /api/scan/{id}/stream", s.handleScanStream)
 	mux.HandleFunc("GET /api/scan/{id}/export.csv", s.handleScanExport)
 
+	mux.HandleFunc("GET /api/capabilities", s.handleCapabilities)
+
 	// Per-host, on-demand diagnostic tools.
 	mux.HandleFunc("POST /api/tools/ping", s.handleToolPing)
 	mux.HandleFunc("POST /api/tools/osguess", s.handleToolOSGuess)
@@ -36,6 +38,7 @@ func NewRouter() http.Handler {
 	mux.HandleFunc("POST /api/tools/service", s.handleToolService)
 	mux.HandleFunc("POST /api/tools/traceroute", s.handleToolTracerouteStart)
 	mux.HandleFunc("GET /api/tools/traceroute/{id}/stream", s.handleToolTracerouteStream)
+	mux.HandleFunc("POST /api/tools/deepscan", s.handleToolDeepScan)
 	mux.HandleFunc("POST /api/tools/wol", s.handleToolWakeOnLAN)
 
 	return mux

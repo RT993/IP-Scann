@@ -382,6 +382,11 @@
   const pingBody = document.getElementById("pingBody");
   const portScanRunBtn = document.getElementById("portScanRunBtn");
   const portScanBody = document.getElementById("portScanBody");
+  const deepScanRunBtn = document.getElementById("deepScanRunBtn");
+  const deepScanServiceVersion = document.getElementById("deepScanServiceVersion");
+  const deepScanOSDetection = document.getElementById("deepScanOSDetection");
+  const deepScanNote = document.getElementById("deepScanNote");
+  const deepScanBody = document.getElementById("deepScanBody");
   const tracerouteRunBtn = document.getElementById("tracerouteRunBtn");
   const tracerouteBody = document.getElementById("tracerouteBody");
   const wolRunBtn = document.getElementById("wolRunBtn");
@@ -391,6 +396,16 @@
   let toolHost = null;
   let toolOpenPorts = [];
   let tracerouteSource = null;
+  let capabilities = { nmapAvailable: false, isRoot: false };
+
+  async function loadCapabilities() {
+    try {
+      const res = await fetch("/api/capabilities");
+      capabilities = await res.json();
+    } catch {
+      /* deep scan section just stays disabled */
+    }
+  }
 
   resultsBody.addEventListener("click", (e) => {
     const btn = e.target.closest(".tools-btn");
@@ -416,9 +431,11 @@
     pingBody.innerHTML = "";
     portScanBody.innerHTML = "";
     tracerouteBody.innerHTML = "";
+    deepScanBody.innerHTML = "";
     wolResult.textContent = "";
     wolRunBtn.disabled = !host.mac;
     renderQuickLinks();
+    renderDeepScanNote();
 
     toolsOverlay.hidden = false;
     document.addEventListener("keydown", onModalKeydown);
@@ -641,6 +658,78 @@
     }
   }
 
+  function renderDeepScanNote() {
+    if (!capabilities.nmapAvailable) {
+      deepScanNote.textContent = 'nmap isn’t installed — install it with “brew install nmap” to enable real OS fingerprinting and full version detection here.';
+      deepScanRunBtn.disabled = true;
+      deepScanServiceVersion.disabled = true;
+      deepScanOSDetection.disabled = true;
+      return;
+    }
+    deepScanRunBtn.disabled = false;
+    deepScanServiceVersion.disabled = false;
+    deepScanOSDetection.disabled = false;
+    deepScanNote.textContent = capabilities.isRoot
+      ? "Running as root — full OS detection is available."
+      : 'Not running as root — nmap will likely skip OS detection. Quit and relaunch with "sudo" for it.';
+  }
+
+  deepScanRunBtn.addEventListener("click", async () => {
+    if (!toolHost || !capabilities.nmapAvailable) return;
+    deepScanRunBtn.disabled = true;
+    deepScanBody.innerHTML = '<span class="muted-line">Running nmap… this can take up to a minute.</span>';
+    try {
+      const res = await fetch("/api/tools/deepscan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ip: toolHost.ip,
+          serviceVersion: deepScanServiceVersion.checked,
+          osDetection: deepScanOSDetection.checked,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      renderDeepScanResult(data);
+    } catch (err) {
+      deepScanBody.innerHTML = `<span class="muted-line">Deep scan failed: ${escapeHtml(err.message)}</span>`;
+    } finally {
+      deepScanRunBtn.disabled = false;
+    }
+  });
+
+  function renderDeepScanResult(result) {
+    deepScanBody.innerHTML = "";
+    if (result.osMatches && result.osMatches.length) {
+      const osDiv = document.createElement("div");
+      osDiv.className = "mono";
+      osDiv.textContent = "OS: " + result.osMatches.map((m) => `${m.name} (${m.accuracy}%)`).join(" / ");
+      deepScanBody.appendChild(osDiv);
+    }
+    if (result.ports && result.ports.length) {
+      const table = document.createElement("table");
+      table.innerHTML = "<thead><tr><th>Port</th><th>Service</th><th>Product / version</th></tr></thead>";
+      const tbody = document.createElement("tbody");
+      for (const p of result.ports) {
+        const tr = document.createElement("tr");
+        const tdPort = document.createElement("td");
+        tdPort.className = "mono";
+        tdPort.textContent = `${p.port}/${p.protocol}`;
+        const tdService = document.createElement("td");
+        tdService.textContent = p.service || "";
+        const tdVersion = document.createElement("td");
+        tdVersion.textContent = [p.product, p.version, p.extraInfo].filter(Boolean).join(" ");
+        tr.append(tdPort, tdService, tdVersion);
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      deepScanBody.appendChild(table);
+    }
+    if (!deepScanBody.children.length) {
+      deepScanBody.innerHTML = '<span class="muted-line">nmap found nothing to report.</span>';
+    }
+  }
+
   wolRunBtn.addEventListener("click", async () => {
     if (!toolHost || !toolHost.mac) return;
     wolRunBtn.disabled = true;
@@ -700,4 +789,5 @@
   setScanState("idle");
   renderTable();
   loadInterfaces();
+  loadCapabilities();
 })();

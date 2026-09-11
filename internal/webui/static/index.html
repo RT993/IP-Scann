@@ -167,6 +167,25 @@
 
       <section class="tool-section">
         <div class="tool-section-head">
+          <h3>Deep scan (nmap)</h3>
+          <button id="deepScanRunBtn" class="btn btn-ghost btn-sm" type="button">Run deep scan</button>
+        </div>
+        <div class="deep-scan-options">
+          <label class="checkbox-field">
+            <input id="deepScanServiceVersion" type="checkbox" checked />
+            <span>Service/version detection</span>
+          </label>
+          <label class="checkbox-field">
+            <input id="deepScanOSDetection" type="checkbox" />
+            <span>OS detection (needs sudo)</span>
+          </label>
+        </div>
+        <p id="deepScanNote" class="hint"></p>
+        <div id="deepScanBody" class="tool-result"></div>
+      </section>
+
+      <section class="tool-section">
+        <div class="tool-section-head">
           <h3>Traceroute</h3>
           <button id="tracerouteRunBtn" class="btn btn-ghost btn-sm" type="button">Traceroute</button>
         </div>

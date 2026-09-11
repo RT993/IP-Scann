@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/rt993/ip-scann/internal/api"
+	"github.com/rt993/ip-scann/internal/scanner"
 )
 
 // version is set via -ldflags "-X main.version=..." by release builds.
@@ -47,6 +48,7 @@ func main() {
 
 	log.Printf("IP Scanner listening on %s", url)
 	log.Printf("Scan only networks you own or are authorized to test.")
+	logDeepScanCapability()
 
 	srv := &http.Server{
 		Addr:              addr,
@@ -55,6 +57,18 @@ func main() {
 	}
 	if err := srv.ListenAndServe(); err != nil {
 		log.Fatal(err)
+	}
+}
+
+func logDeepScanCapability() {
+	if !scanner.NmapAvailable() {
+		log.Printf(`nmap not found on PATH: the optional "Deep scan" tool will be unavailable (install with "brew install nmap" to enable it).`)
+		return
+	}
+	if scanner.IsRoot() {
+		log.Printf("nmap found and running as root: full deep-scan OS detection is available.")
+	} else {
+		log.Printf(`nmap found: deep-scan service/version detection is available; OS detection needs "sudo".`)
 	}
 }
 
