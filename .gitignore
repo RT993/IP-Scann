@@ -1,0 +1,5 @@
+/dist/
+/ip-scanner
+/ip-scanner-*
+*.log
+.DS_Store
