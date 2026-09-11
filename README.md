@@ -27,8 +27,27 @@ server and opens the UI in your browser.
   names come from an offline snapshot of the full IEEE OUI registry (40k+
   manufacturer prefixes); refresh it any time with `make update-oui`.
 - **Optional port scan** — checks a curated list of common ports (SSH, HTTP,
-  SMB, RDP, printers, databases, …) per host.
+  SMB, RDP, printers, databases, …) per host during the sweep.
 - **CSV export** of the current results.
+- **Per-host tools** — click the wrench icon on any row to open:
+  - **OS guess** — a heuristic label (Linux/macOS/Unix, Windows, network
+    device, …) with the evidence behind it, computed automatically for
+    every host during the sweep and refinable here.
+  - **Ping / latency check** — sends 4 echo requests and reports
+    min/avg/max round-trip time and packet loss.
+  - **Port scanner + service/version detection** — scans a broad list of
+    ~100 well-known ports, then grabs a live banner from each one that's
+    open to identify the service (and version, where the service
+    advertises one).
+  - **Traceroute** — maps the network path to the host, hop by hop, live.
+  - **Wake-on-LAN** — sends a magic packet to power on a sleeping,
+    WoL-enabled device.
+  - **Shared folder / printer / remote-access quick links** — one-click
+    `smb://`, printer, RDP, VNC, and SSH links, generated from whatever
+    ports the scan found open.
+
+  See [How the tools work](#how-the-tools-work) for what each one can and
+  can't actually tell you.
 - Vintage-terminal-meets-modern-app UI: amber/paper light theme, a
   dark "phosphor" theme, live progress bar, sortable/filterable results
   table.
@@ -115,16 +134,59 @@ minimal IoT firmware) shows up with a blank hostname — that's the device
 genuinely not advertising a name over any of the three protocols, not a
 scan failure.
 
+## How the tools work
+
+Like the ping-based conflict detection above, every per-host tool is built
+to need no root/admin privileges and no raw sockets. That keeps it simple to
+run, but it's worth being clear about what each one actually is:
+
+- **OS guess is a heuristic, not fingerprinting.** Real OS fingerprinting
+  (what nmap or p0f do) inspects the exact ordering and values of TCP
+  options in a raw SYN/ACK packet, which needs a raw socket and elevated
+  privileges. Instead, this combines three unprivileged signals: the TTL on
+  the ping reply (Linux/macOS/BSD default to 64, Windows to 128, and many
+  routers/appliances to 255 — a strong but not certain tell), the MAC
+  vendor, and any well-known ports found open (e.g. 3389 strongly implies
+  Windows). The "signals" list under the guess shows exactly which of these
+  fired, so you can judge the guess yourself rather than trust a label.
+- **Service/version detection is banner-grabbing, not nmap's probe
+  database.** It reads whatever a service volunteers on connect (SSH, FTP,
+  SMTP, MySQL, Redis, etc. all send a greeting first), or for HTTP/TLS ports
+  sends a minimal request and reads the `Server:` header or the TLS
+  certificate. This correctly identifies most common services and their
+  version string when the service exposes one in its banner, but won't
+  reverse-engineer a version nmap's much larger signature database might
+  catch, and a service that doesn't volunteer a version just gets the
+  conventional name for its port.
+- **Traceroute and ping** shell out to the OS's own `traceroute`/`ping`
+  binaries (both run unprivileged on macOS by default), the same approach
+  used for the main sweep and conflict detection.
+- **Wake-on-LAN** only sends the magic packet — it's inherently
+  fire-and-forget UDP, so no tool (this one included) can confirm the
+  target actually woke up. It requires Wake-on-LAN to be enabled in the
+  target device's firmware/OS network settings.
+- **Quick-open links** (shared folder, printer, RDP, VNC, SSH) are plain
+  `smb://`, `rdp://`, `vnc://`, `ssh://`, and `http(s)://` links generated
+  from whichever ports a port scan found open; your browser hands them off
+  to whatever app your Mac has registered for that scheme (Finder for
+  `smb://`, Microsoft Remote Desktop for `rdp://`, etc.) — the same
+  handoff any desktop scanner's "open share" button relies on, just via a
+  standard link instead of a native API call.
+
 ## Architecture
 
 ```
 main.go                     entrypoint: flags, HTTP server, opens browser
-internal/netutil/           local interface discovery, CIDR → host list
+internal/netutil/           local interface discovery, CIDR → host list,
+                             broadcast-address math for Wake-on-LAN
 internal/scanner/           ping/TCP probing, ARP table reading, OUI vendor
                              lookup, duplicate-IP/MAC conflict detection,
-                             scan orchestration
+                             scan orchestration, and the per-host tools:
+                             OS guessing, banner/service detection,
+                             traceroute, Wake-on-LAN
 internal/api/                job manager, Server-Sent Events streaming,
-                             REST + CSV export endpoints
+                             REST + CSV export endpoints, per-host tool
+                             endpoints (/api/tools/*)
 internal/webui/static/      embedded frontend (plain HTML/CSS/JS, no
                              build step, no external dependencies)
 ```
@@ -136,7 +198,9 @@ architectures (`GOOS=darwin GOARCH=amd64|arm64`) trivial and dependency-free.
 ## Development
 
 ```sh
-make test   # unit tests (CIDR expansion, ARP parsing, vendor lookup, conflict logic)
+make test   # unit tests (CIDR expansion, ARP parsing, vendor lookup, conflict
+            # logic, OS-guess heuristic, banner parsing, traceroute parsing,
+            # Wake-on-LAN packet construction)
 make vet    # go vet
 make run    # go run .
 ```

@@ -17,6 +17,8 @@ type Host struct {
 	Conflict       bool     `json:"conflict"`
 	ConflictReason string   `json:"conflictReason,omitempty"` // "duplicate-ip" | "duplicate-mac"
 	ConflictWith   []string `json:"conflictWith,omitempty"`   // the other MACs (or IPs) involved
+	TTL            int      `json:"ttl,omitempty"`
+	OS             OSGuess  `json:"os"`
 }
 
 // Options configures a single scan run.

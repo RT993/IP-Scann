@@ -41,3 +41,26 @@ func HostsInCIDR(cidr string) ([]netip.Addr, error) {
 	}
 	return addrs, nil
 }
+
+// BroadcastAddr returns the subnet-directed broadcast address for an IPv4
+// CIDR (e.g. "192.168.1.0/24" -> "192.168.1.255"), used to target
+// Wake-on-LAN packets more precisely than the limited broadcast address.
+func BroadcastAddr(cidr string) (string, error) {
+	prefix, err := netip.ParsePrefix(cidr)
+	if err != nil {
+		return "", fmt.Errorf("invalid CIDR %q: %w", cidr, err)
+	}
+	if !prefix.Addr().Is4() {
+		return "", fmt.Errorf("only IPv4 networks are supported")
+	}
+	prefix = prefix.Masked()
+	network := prefix.Addr().As4()
+	hostBits := 32 - prefix.Bits()
+
+	v := uint32(network[0])<<24 | uint32(network[1])<<16 | uint32(network[2])<<8 | uint32(network[3])
+	if hostBits > 0 {
+		v |= (uint32(1) << uint(hostBits)) - 1
+	}
+	b := [4]byte{byte(v >> 24), byte(v >> 16), byte(v >> 8), byte(v)}
+	return netip.AddrFrom4(b).String(), nil
+}

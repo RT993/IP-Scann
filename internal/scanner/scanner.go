@@ -84,7 +84,7 @@ passLoop:
 				defer wg.Done()
 				defer func() { <-sem }()
 
-				alive, latency := pingOnce(ctx, ip, timeout)
+				alive, latency, ttl := pingOnce(ctx, ip, timeout)
 				method := "icmp"
 				var openPorts []int
 				if opts.PortScan {
@@ -130,9 +130,13 @@ passLoop:
 				if latency > 0 {
 					h.LatencyMs = round1(float64(latency.Microseconds()) / 1000.0)
 				}
+				if ttl > 0 {
+					h.TTL = ttl
+				}
 				if len(openPorts) > 0 {
 					h.OpenPorts = mergeInts(h.OpenPorts, openPorts)
 				}
+				h.OS = GuessOS(h.TTL, h.Vendor, h.OpenPorts)
 				hostsMu.Unlock()
 
 				if !exists {
@@ -161,6 +165,7 @@ passLoop:
 				if h.MAC == "" {
 					h.MAC = mac
 					h.Vendor = VendorLookup(mac)
+					h.OS = GuessOS(h.TTL, h.Vendor, h.OpenPorts)
 					newlyEnriched = append(newlyEnriched, *h)
 				}
 			}

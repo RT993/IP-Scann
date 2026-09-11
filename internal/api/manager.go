@@ -16,7 +16,7 @@ import (
 type job struct {
 	id     string
 	cancel context.CancelFunc
-	bc     *broadcaster
+	bc     *broadcaster[scanner.Event]
 
 	mu     sync.Mutex
 	status scanner.Status
@@ -68,7 +68,7 @@ func (m *manager) start(opts scanner.Options) (*job, error) {
 	j := &job{
 		id:     id,
 		cancel: cancel,
-		bc:     newBroadcaster(),
+		bc:     newBroadcaster[scanner.Event](),
 		hosts:  make(map[string]*scanner.Host),
 		status: scanner.Status{ID: id, State: scanner.StateRunning, CIDR: opts.CIDR, StartedAt: time.Now()},
 	}

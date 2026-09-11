@@ -3,28 +3,28 @@ package api
 import (
 	"context"
 	"sync"
-
-	"github.com/rt993/ip-scann/internal/scanner"
 )
 
-// broadcaster keeps the full event log for one scan job and lets any number
-// of SSE clients subscribe. A late subscriber first replays everything that
-// already happened, then blocks for new events -- so refreshing the browser
-// mid-scan still shows every host found so far.
-type broadcaster struct {
+// broadcaster keeps the full event log for one job (a scan, or a
+// traceroute run) and lets any number of SSE clients subscribe. A late
+// subscriber first replays everything that already happened, then blocks
+// for new events -- so refreshing the browser mid-run still shows
+// everything found so far. It's generic so the same implementation backs
+// both scanner.Event streams and traceroute hop streams.
+type broadcaster[T any] struct {
 	mu     sync.Mutex
 	cond   *sync.Cond
-	events []scanner.Event
+	events []T
 	closed bool
 }
 
-func newBroadcaster() *broadcaster {
-	b := &broadcaster{}
+func newBroadcaster[T any]() *broadcaster[T] {
+	b := &broadcaster[T]{}
 	b.cond = sync.NewCond(&b.mu)
 	return b
 }
 
-func (b *broadcaster) publish(e scanner.Event) {
+func (b *broadcaster[T]) publish(e T) {
 	b.mu.Lock()
 	if b.closed {
 		b.mu.Unlock()
@@ -35,7 +35,7 @@ func (b *broadcaster) publish(e scanner.Event) {
 	b.cond.Broadcast()
 }
 
-func (b *broadcaster) close() {
+func (b *broadcaster[T]) close() {
 	b.mu.Lock()
 	b.closed = true
 	b.mu.Unlock()
@@ -44,7 +44,7 @@ func (b *broadcaster) close() {
 
 // subscribe streams every event (past and future) to fn, in order, until
 // ctx is cancelled, the job finishes, or fn returns false.
-func (b *broadcaster) subscribe(ctx context.Context, fn func(scanner.Event) bool) {
+func (b *broadcaster[T]) subscribe(ctx context.Context, fn func(T) bool) {
 	stop := make(chan struct{})
 	defer close(stop)
 	go func() {

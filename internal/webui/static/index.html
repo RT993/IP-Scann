@@ -105,9 +105,11 @@
               <th data-sort="hostname" class="sortable">Hostname</th>
               <th data-sort="mac" class="sortable">MAC address</th>
               <th data-sort="vendor" class="sortable">Vendor</th>
+              <th>OS guess</th>
               <th data-sort="latencyMs" class="sortable num">Latency</th>
               <th>Open ports</th>
               <th>Flags</th>
+              <th class="col-tools"></th>
             </tr>
           </thead>
           <tbody id="resultsBody"></tbody>
@@ -128,6 +130,62 @@
 
 </div>
 
+<div id="toolsOverlay" class="modal-overlay" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="toolsModalTitle">
+    <div class="modal-head">
+      <div>
+        <h2 id="toolsModalTitle" class="mono"></h2>
+        <p id="toolsModalSubtitle" class="muted"></p>
+      </div>
+      <button id="toolsCloseBtn" class="icon-btn" type="button" aria-label="Close">
+        <svg viewBox="0 0 24 24" width="16" height="16"><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <div class="modal-body">
+
+      <section class="tool-section">
+        <h3>OS guess</h3>
+        <div id="osGuessBody" class="tool-result"></div>
+      </section>
+
+      <section class="tool-section">
+        <div class="tool-section-head">
+          <h3>Ping / latency</h3>
+          <button id="pingRunBtn" class="btn btn-ghost btn-sm" type="button">Ping ×4</button>
+        </div>
+        <div id="pingBody" class="tool-result"></div>
+      </section>
+
+      <section class="tool-section">
+        <div class="tool-section-head">
+          <h3>Ports &amp; services</h3>
+          <button id="portScanRunBtn" class="btn btn-ghost btn-sm" type="button">Scan ports</button>
+        </div>
+        <div id="portScanBody" class="tool-result"></div>
+      </section>
+
+      <section class="tool-section">
+        <div class="tool-section-head">
+          <h3>Traceroute</h3>
+          <button id="tracerouteRunBtn" class="btn btn-ghost btn-sm" type="button">Traceroute</button>
+        </div>
+        <div id="tracerouteBody" class="tool-result"></div>
+      </section>
+
+      <section class="tool-section">
+        <h3>Actions</h3>
+        <div class="tool-actions-row">
+          <button id="wolRunBtn" class="btn btn-ghost btn-sm" type="button">Wake-on-LAN</button>
+          <span id="wolResult" class="mono muted"></span>
+        </div>
+        <div id="quickLinksBody" class="quick-links"></div>
+      </section>
+
+    </div>
+  </div>
+</div>
+
 <template id="rowTemplate">
   <tr>
     <td class="col-status"><span class="dot"></span></td>
@@ -135,9 +193,15 @@
     <td class="hostname-cell"></td>
     <td class="mono mac-cell"></td>
     <td class="vendor-cell"></td>
+    <td class="os-cell"></td>
     <td class="mono num latency-cell"></td>
     <td class="ports-cell"></td>
     <td class="flags-cell"></td>
+    <td class="col-tools">
+      <button class="tools-btn" type="button" title="Tools" aria-label="Open tools for this device">
+        <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 1-5.4 5.4L4 17l3 3 5.3-5.3a4 4 0 0 1 5.4-5.4L21 6l-3-3z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </button>
+    </td>
   </tr>
 </template>
 

@@ -11,12 +11,13 @@ import (
 // Server holds the shared state behind every HTTP handler.
 type Server struct {
 	manager *manager
+	tools   *toolsManager
 }
 
 // NewRouter builds the complete HTTP handler for the application: the
 // embedded static frontend plus the JSON/SSE API it talks to.
 func NewRouter() http.Handler {
-	s := &Server{manager: newManager()}
+	s := &Server{manager: newManager(), tools: newToolsManager()}
 
 	mux := http.NewServeMux()
 	mux.Handle("/", http.FileServer(http.FS(webui.FS())))
@@ -27,6 +28,15 @@ func NewRouter() http.Handler {
 	mux.HandleFunc("POST /api/scan/{id}/stop", s.handleScanStop)
 	mux.HandleFunc("GET /api/scan/{id}/stream", s.handleScanStream)
 	mux.HandleFunc("GET /api/scan/{id}/export.csv", s.handleScanExport)
+
+	// Per-host, on-demand diagnostic tools.
+	mux.HandleFunc("POST /api/tools/ping", s.handleToolPing)
+	mux.HandleFunc("POST /api/tools/osguess", s.handleToolOSGuess)
+	mux.HandleFunc("POST /api/tools/portscan", s.handleToolPortScan)
+	mux.HandleFunc("POST /api/tools/service", s.handleToolService)
+	mux.HandleFunc("POST /api/tools/traceroute", s.handleToolTracerouteStart)
+	mux.HandleFunc("GET /api/tools/traceroute/{id}/stream", s.handleToolTracerouteStream)
+	mux.HandleFunc("POST /api/tools/wol", s.handleToolWakeOnLAN)
 
 	return mux
 }

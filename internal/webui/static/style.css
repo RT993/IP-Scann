@@ -397,9 +397,127 @@ tr.conflict-row:hover { background: var(--bad-soft); filter: brightness(0.97); }
 .footer { text-align: center; padding-top: 4px; }
 .footer p { margin: 0; font-size: 11.5px; color: var(--text-muted); }
 
+/* ---------- OS cell & tools button ---------- */
+.os-cell { font-size: 12.5px; }
+.os-cell .os-confidence {
+  display: inline-block;
+  margin-left: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.col-tools { width: 34px; text-align: center; }
+.tools-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text-muted);
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+.tools-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ---------- Tools modal ---------- */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 15, 5, .45);
+  align-items: flex-start;
+  justify-content: center;
+  padding: 5vh 16px;
+  overflow-y: auto;
+  z-index: 100;
+}
+.modal-overlay:not([hidden]) { display: flex; }
+:root[data-theme="dark"] .modal-overlay { background: rgba(0, 0, 0, .6); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .modal-overlay { background: rgba(0, 0, 0, .6); }
+}
+
+.modal {
+  width: 100%;
+  max-width: 640px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-head h2 { margin: 0; font-size: 16px; }
+.modal-head p { margin: 3px 0 0; font-size: 12.5px; }
+
+.modal-body {
+  padding: 6px 18px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 72vh;
+  overflow-y: auto;
+}
+
+.tool-section { border-top: 1px dashed var(--border); padding: 14px 0; }
+.tool-section:first-child { border-top: none; }
+.tool-section h3 {
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+.tool-section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; }
+.tool-section-head h3 { margin: 0; }
+
+.btn-sm { padding: 6px 12px; font-size: 12.5px; }
+
+.tool-result { font-size: 13px; color: var(--text); }
+.tool-result .muted-line { color: var(--text-muted); font-size: 12.5px; }
+.tool-result table { font-size: 12.5px; }
+.tool-result td, .tool-result th { padding: 5px 8px; }
+
+.signal-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.signal-list li { font-size: 12px; color: var(--text-muted); padding-left: 14px; position: relative; }
+.signal-list li::before { content: "–"; position: absolute; left: 0; }
+
+.hop-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-family: var(--font-mono); font-size: 12px; }
+.hop-list li { display: flex; gap: 10px; padding: 3px 6px; border-radius: 5px; }
+.hop-list li:nth-child(odd) { background: var(--surface-2); }
+.hop-num { color: var(--text-muted); width: 2.5em; }
+.hop-timeout { color: var(--text-muted); }
+
+.tool-actions-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+
+.quick-links { display: flex; flex-wrap: wrap; gap: 8px; }
+.quick-links a {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-strong);
+  text-decoration: none;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-radius: 7px;
+  padding: 6px 11px;
+}
+.quick-links a:hover { border-color: var(--accent); }
+
 /* ---------- Responsive ---------- */
 @media (max-width: 640px) {
   .controls-row { flex-direction: column; align-items: stretch; }
   .field-actions { margin-left: 0; }
   #resultsSummary { display: none; }
+  .modal-overlay { padding: 0; align-items: stretch; }
+  .modal { max-width: none; border-radius: 0; min-height: 100%; }
 }

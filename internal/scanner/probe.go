@@ -1,19 +1,28 @@
 package scanner
 
 import (
+	"bytes"
 	"context"
 	"net"
 	"os/exec"
+	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"sync"
 	"time"
 )
 
+var ttlRe = regexp.MustCompile(`(?i)ttl=(\d+)`)
+
 // pingOnce shells out to the system "ping" binary for a single echo request.
 // Using the OS binary (rather than a raw ICMP socket) is what lets this run
-// without root/admin privileges on both Intel and Apple Silicon Macs.
-func pingOnce(ctx context.Context, ip string, timeout time.Duration) (bool, time.Duration) {
+// without root/admin privileges on both Intel and Apple Silicon Macs. It
+// also reports the reply's TTL, parsed from ping's own output -- the
+// cheapest signal available (without raw sockets) for guessing a host's OS,
+// since Linux/macOS/BSD, Windows, and networking gear each ship with a
+// different default initial TTL.
+func pingOnce(ctx context.Context, ip string, timeout time.Duration) (alive bool, latency time.Duration, ttl int) {
 	if timeout <= 0 {
 		timeout = 700 * time.Millisecond
 	}
@@ -39,13 +48,82 @@ func pingOnce(ctx context.Context, ip string, timeout time.Duration) (bool, time
 		cmd = exec.CommandContext(cmdCtx, "ping", "-c", "1", "-W", strconv.Itoa(timeoutSec), ip)
 	}
 
+	var out bytes.Buffer
+	cmd.Stdout = &out
+
 	start := time.Now()
 	err := cmd.Run()
 	elapsed := time.Since(start)
 	if err != nil {
-		return false, 0
+		return false, 0, 0
 	}
-	return true, elapsed
+	if m := ttlRe.FindSubmatch(out.Bytes()); m != nil {
+		ttl, _ = strconv.Atoi(string(m[1]))
+	}
+	return true, elapsed, ttl
+}
+
+// PingStats is the result of sending several echo requests to one host, in
+// the same shape "ping -c N" itself reports (sent/received/loss, min/avg/max).
+type PingStats struct {
+	Sent      int       `json:"sent"`
+	Received  int       `json:"received"`
+	LossPct   float64   `json:"lossPct"`
+	MinMs     float64   `json:"minMs,omitempty"`
+	AvgMs     float64   `json:"avgMs,omitempty"`
+	MaxMs     float64   `json:"maxMs,omitempty"`
+	TTL       int       `json:"ttl,omitempty"`
+	SamplesMs []float64 `json:"samplesMs,omitempty"`
+}
+
+// Ping sends count echo requests to ip, spaced slightly apart, and
+// summarizes the round-trip times -- the on-demand "ping / latency check"
+// tool, as opposed to the single best-effort probe used during a sweep.
+func Ping(ctx context.Context, ip string, count int, timeout time.Duration) PingStats {
+	if count <= 0 {
+		count = 4
+	}
+	if count > 10 {
+		count = 10
+	}
+	stats := PingStats{Sent: count}
+
+	var sum, min, max float64
+	for i := 0; i < count; i++ {
+		if ctx.Err() != nil {
+			break
+		}
+		alive, latency, ttl := pingOnce(ctx, ip, timeout)
+		if alive {
+			ms := round1(float64(latency.Microseconds()) / 1000.0)
+			stats.SamplesMs = append(stats.SamplesMs, ms)
+			stats.Received++
+			sum += ms
+			if stats.Received == 1 || ms < min {
+				min = ms
+			}
+			if ms > max {
+				max = ms
+			}
+			if ttl > 0 {
+				stats.TTL = ttl
+			}
+		}
+		if i < count-1 {
+			select {
+			case <-time.After(200 * time.Millisecond):
+			case <-ctx.Done():
+			}
+		}
+	}
+
+	stats.LossPct = round1(100 * float64(stats.Sent-stats.Received) / float64(stats.Sent))
+	if stats.Received > 0 {
+		stats.MinMs = min
+		stats.MaxMs = max
+		stats.AvgMs = round1(sum / float64(stats.Received))
+	}
+	return stats
 }
 
 // tcpProbe attempts a TCP connect against a set of common ports. Many hosts
@@ -82,6 +160,16 @@ func tcpProbe(ctx context.Context, ip string, ports []int, timeout time.Duration
 	}
 	wg.Wait()
 	return alive, open, latency
+}
+
+// ScanPorts checks each of ports concurrently and returns the ones that are
+// open, sorted ascending. This is the on-demand per-host "port scanner"
+// tool -- thorough and possibly large port lists are fine here, unlike the
+// small default list used during a whole-network sweep.
+func ScanPorts(ctx context.Context, ip string, ports []int, timeout time.Duration) []int {
+	_, open, _ := tcpProbe(ctx, ip, ports, timeout)
+	sort.Ints(open)
+	return open
 }
 
 // lookupHostname tries several ways to name a device, in order of how

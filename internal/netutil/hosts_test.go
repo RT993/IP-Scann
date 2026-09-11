@@ -59,3 +59,21 @@ func TestHostsInCIDR_IPv6Rejected(t *testing.T) {
 		t.Fatal("expected error for IPv6 CIDR")
 	}
 }
+
+func TestBroadcastAddr(t *testing.T) {
+	cases := map[string]string{
+		"192.168.1.0/24":   "192.168.1.255",
+		"192.168.1.128/25": "192.168.1.255",
+		"10.0.0.0/16":      "10.0.255.255",
+		"10.0.0.5/32":      "10.0.0.5",
+	}
+	for cidr, want := range cases {
+		got, err := BroadcastAddr(cidr)
+		if err != nil {
+			t.Fatalf("BroadcastAddr(%q): %v", cidr, err)
+		}
+		if got != want {
+			t.Errorf("BroadcastAddr(%q) = %q, want %q", cidr, got, want)
+		}
+	}
+}
