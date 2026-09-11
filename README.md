@@ -125,6 +125,24 @@ itself, which is out of scope for this tool.
 ./scripts/renew-dhcp-lease.sh en0      # or name one explicitly
 ```
 
+**Don't run this on a machine whose IP has to stay fixed** (e.g. it's
+running a server like Jellyfin, has port forwards pointing at it, or other
+devices reference it by IP). "Static IP" usually means one of two
+different things, and only one of them is safe here:
+
+- **DHCP reservation** — the *router* always hands this Mac the same
+  address, but the Mac's own network settings still say "Using DHCP."
+  Renewing is harmless: you get the same address back.
+- **Manually configured** — set to "Manually" in System Settings → Network
+  directly on the Mac, not from the router. Forcing DHCP here doesn't
+  renew anything — it **switches the interface from Manual to DHCP**,
+  handing it whatever address the router's pool assigns next.
+
+The script checks which one it's dealing with (`networksetup -getinfo`)
+and refuses to touch a manually-configured interface, printing why. If
+you're not sure which kind you have, the script's refusal message (or
+lack of one) will tell you.
+
 ## How hostname detection works
 
 Most home routers don't publish DNS names for the devices they hand out
