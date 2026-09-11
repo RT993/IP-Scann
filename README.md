@@ -20,10 +20,12 @@ server and opens the UI in your browser.
   behind two different IPs, it's flagged as a conflict in the results table
   and summarized in a banner at the top. This works without root/admin
   privileges (see [How conflict detection works](#how-conflict-detection-works)).
-- **Hostname, MAC & vendor lookup** — reverse DNS plus an offline snapshot
-  of the full IEEE OUI registry (40k+ manufacturer prefixes), so vendor
-  names resolve without any network calls. Refresh it any time with
-  `make update-oui`.
+- **Hostname, MAC & vendor lookup** — chains reverse DNS, an mDNS/Bonjour
+  reverse-PTR query, and a NetBIOS Name Service query so most devices get
+  named even when the router's DNS doesn't know about them (see
+  [How hostname detection works](#how-hostname-detection-works)). Vendor
+  names come from an offline snapshot of the full IEEE OUI registry (40k+
+  manufacturer prefixes); refresh it any time with `make update-oui`.
 - **Optional port scan** — checks a curated list of common ports (SSH, HTTP,
   SMB, RDP, printers, databases, …) per host.
 - **CSV export** of the current results.
@@ -88,6 +90,30 @@ conflict occurring between passes, or on a very brief window, could be
 missed. Increase **Advanced options → Conflict-detection passes** for more
 thorough (if slower) checking on networks where you suspect an
 intermittent conflict.
+
+## How hostname detection works
+
+Most home routers don't publish DNS names for the devices they hand out
+DHCP leases to, so relying on reverse DNS alone (`net.LookupAddr`) misses
+most phones, smart-home gear, and IoT devices. For each host, the scanner
+tries three things in order and keeps the first name it gets:
+
+1. **Reverse DNS** — works when the router (or a local DNS server) does
+   publish DHCP client names.
+2. **mDNS/Bonjour** — sends a direct (unicast) reverse-lookup query to the
+   device's port 5353. Anything running an mDNS responder answers this —
+   which is effectively all Apple devices, most phones, printers, smart
+   speakers, and IoT gear (avahi, the responder embedded in most embedded
+   Linux devices, honors it too) — independent of whatever the router's DNS
+   knows.
+3. **NetBIOS Name Service** — sends a node-status query to port 137, which
+   reliably returns the computer name for Windows PCs and older NAS/printer
+   appliances that speak SMB/NetBIOS but don't run mDNS.
+
+A device that answers none of these (rare, but it happens with some
+minimal IoT firmware) shows up with a blank hostname — that's the device
+genuinely not advertising a name over any of the three protocols, not a
+scan failure.
 
 ## Architecture
 

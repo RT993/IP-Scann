@@ -84,9 +84,35 @@ func tcpProbe(ctx context.Context, ip string, ports []int, timeout time.Duration
 	return alive, open, latency
 }
 
-// lookupHostname performs a bounded reverse-DNS/mDNS lookup.
+// lookupHostname tries several ways to name a device, in order of how
+// likely each is to actually be configured on a home/office LAN:
+//
+//  1. Reverse DNS (net.LookupAddr) -- works when the router runs a DNS
+//     server that publishes DHCP client names (many do, some don't).
+//  2. mDNS/Bonjour reverse lookup -- covers Apple devices, phones,
+//     printers, smart-home gear, and anything else running an mDNS
+//     responder (avahi is extremely common on embedded Linux), regardless
+//     of what the router's DNS knows.
+//  3. NetBIOS Name Service -- covers Windows PCs and older NAS/printer
+//     appliances that speak SMB/NetBIOS but not mDNS.
+//
+// Each step is short and only runs if the previous one came up empty, so
+// well-behaved devices resolve fast and only silent ones pay the full cost.
 func lookupHostname(ctx context.Context, ip string) string {
-	ctx, cancel := context.WithTimeout(ctx, 600*time.Millisecond)
+	if name := reverseDNSLookup(ctx, ip); name != "" {
+		return name
+	}
+	if name := mdnsHostname(ip, 350*time.Millisecond); name != "" {
+		return name
+	}
+	if name := nbnsHostname(ip, 300*time.Millisecond); name != "" {
+		return name
+	}
+	return ""
+}
+
+func reverseDNSLookup(ctx context.Context, ip string) string {
+	ctx, cancel := context.WithTimeout(ctx, 400*time.Millisecond)
 	defer cancel()
 	names, err := net.DefaultResolver.LookupAddr(ctx, ip)
 	if err != nil || len(names) == 0 {
