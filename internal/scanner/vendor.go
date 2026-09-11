@@ -16,9 +16,11 @@ func init() {
 	_ = json.Unmarshal(ouiData, &ouiTable)
 }
 
-// VendorLookup returns a best-effort manufacturer name for a MAC address
-// using a small, bundled offline OUI reference table (not the full IEEE
-// registry). Unrecognized prefixes return "Unknown".
+// VendorLookup returns a manufacturer name for a MAC address using a
+// bundled offline snapshot of the IEEE MA-L (24-bit) OUI registry
+// (internal/scanner/data/oui.json, regenerate with `make update-oui`).
+// Newer MA-M/MA-S (28-/36-bit) allocations and unrecognized prefixes
+// return "Unknown".
 func VendorLookup(mac string) string {
 	clean := strings.ToUpper(strings.ReplaceAll(mac, ":", ""))
 	clean = strings.ReplaceAll(clean, "-", "")

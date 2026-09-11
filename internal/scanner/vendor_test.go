@@ -9,7 +9,7 @@ func TestVendorLookup(t *testing.T) {
 	}{
 		{"b8:27:eb:11:22:33", "Raspberry Pi Foundation"},
 		{"B8:27:EB:11:22:33", "Raspberry Pi Foundation"},
-		{"080027aabbcc", "Oracle VirtualBox"},
+		{"080027aabbcc", "PCS Systemtechnik GmbH"}, // VirtualBox's default OUI
 		{"ff:ff:ff:ff:ff:ff", "Unknown"},
 		{"", "Unknown"},
 	}

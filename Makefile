@@ -3,7 +3,7 @@ DIST       := dist
 VERSION    ?= dev
 LDFLAGS    := -s -w -X main.version=$(VERSION)
 
-.PHONY: run build test vet fmt clean \
+.PHONY: run build test vet fmt clean update-oui \
         build-darwin-amd64 build-darwin-arm64 build-darwin-universal \
         build-linux build-all
 
@@ -24,6 +24,10 @@ fmt:
 
 clean:
 	rm -rf $(DIST) $(APP)
+
+# Refreshes internal/scanner/data/oui.json from the official IEEE registry.
+update-oui:
+	python3 scripts/update-oui.py
 
 ## ---- macOS release builds (Intel + Apple Silicon) ----
 

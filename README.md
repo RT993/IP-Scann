@@ -20,9 +20,10 @@ server and opens the UI in your browser.
   behind two different IPs, it's flagged as a conflict in the results table
   and summarized in a banner at the top. This works without root/admin
   privileges (see [How conflict detection works](#how-conflict-detection-works)).
-- **Hostname, MAC & vendor lookup** — reverse DNS plus an offline OUI
-  reference table for common vendors (Apple, Raspberry Pi, Ubiquiti,
-  Netgear, Espressif/IoT, etc).
+- **Hostname, MAC & vendor lookup** — reverse DNS plus an offline snapshot
+  of the full IEEE OUI registry (40k+ manufacturer prefixes), so vendor
+  names resolve without any network calls. Refresh it any time with
+  `make update-oui`.
 - **Optional port scan** — checks a curated list of common ports (SSH, HTTP,
   SMB, RDP, printers, databases, …) per host.
 - **CSV export** of the current results.
